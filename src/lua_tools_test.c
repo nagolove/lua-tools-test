@@ -7,6 +7,7 @@
 #include "lua.h"
 #include "lualib.h"
 #include "munit.h"
+#include "raylib.h"
 #include <assert.h>
 #include <math.h>
 #include <memory.h>
@@ -16,75 +17,167 @@
 #include <stdlib.h>
 #include <string.h>
 
-static MunitResult test_dump2str_fail(
+static int _table_push_rect_as_arr(Rectangle rect, const char *needle) {
+    assert(needle);
+    lua_State *l = luaL_newstate();
+    luaL_openlibs(l);
+    assert(l);
+    table_push_rect_as_arr(l, rect);
+    char *dump = table_dump2allocated_str(l);
+    if (dump) {
+        //printf(
+            //"test_table_push_rect_as_arr: dump '%s'\n",
+            //dump
+        //);
+        char *sub_str = strstr(dump, needle);
+        //char *sub_str = strstr(dump, "{-11,-11,222,333}");
+        //printf("test_table_push_rect_as_arr: sub_str %s\n", sub_str);
+        free(dump);
+        if (!sub_str) {
+            lua_close(l);
+            return MUNIT_FAIL;
+        }
+    }
+    lua_close(l);
+    return MUNIT_OK;
+}
+
+static MunitResult test_table_push_rect_as_arr(
+    const MunitParameter params[], void* data
+) {
+    int retcode = 0;
+
+    retcode = retcode & _table_push_rect_as_arr(
+        (Rectangle) {
+            .x = -10.,
+            .y = -11.,
+            .width = 222.,
+            .height = 333.,
+        }, "{-10,-11,222,333}"
+    );
+
+    retcode = retcode & _table_push_rect_as_arr(
+        (Rectangle) {
+            .x = 0.,
+            .y = 0.,
+            .width = 2.,
+            .height = 3.,
+        }, "{0,1,2,3}"
+    );
+
+    retcode = retcode & _table_push_rect_as_arr((Rectangle) {}, "{0,1,2,3}");
+
+    return retcode;
+}
+
+static MunitResult test_dump2str_nil_stack_check(
     const MunitParameter params[], void* data
 ) {
     lua_State *lua = luaL_newstate();
     luaL_openlibs(lua);
 
-    const char *code =  "return { &&&% }\n";
+    lua_pushnumber(lua, 1.);
+    lua_pushstring(lua, "hi");
+    
+    const char *code =  "local b = 1";
 
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
     luaL_loadstring(lua, code);
-    /*printf("[%s]\n", stack_dump(lua));*/
-    lua_call(lua, 0, LUA_MULTRET);
-    /*printf("[%s]\n", stack_dump(lua));*/
+    munit_assert(lua_gettop(lua) == 3);
+
+    int type = lua_type(lua, lua_gettop(lua));
+    printf("test_dump2str_empty: %s\n", lua_typename(lua, type));
+    if (type == LUA_TFUNCTION)
+        lua_call(lua, 0, LUA_MULTRET);
+    else
+        printf(
+            "test_dump2str_empty: non function on stack top [%s]\n",
+            stack_dump(lua)
+        );
 
     char *dump = table_dump2allocated_str(lua);
-    /*char *dump = "XXX";*/
+    if (dump) {
+        printf("test_dump2str: dump '%s'\n", dump);
+        free(dump);
+    }
+
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
+    munit_assert(lua_gettop(lua) == 2);
     lua_close(lua);
-    if (!dump) {
-        return MUNIT_FAIL;
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_dump2str_stack_check(
+    const MunitParameter params[], void* data
+) {
+    lua_State *lua = luaL_newstate();
+    luaL_openlibs(lua);
+
+    lua_pushnumber(lua, 1.);
+    lua_pushstring(lua, "hi");
+    
+    const char *code =  "return {  }\n";
+
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
+    luaL_loadstring(lua, code);
+    munit_assert(lua_gettop(lua) == 3);
+
+    int type = lua_type(lua, lua_gettop(lua));
+    printf("test_dump2str_empty: %s\n", lua_typename(lua, type));
+    if (type == LUA_TFUNCTION)
+        lua_call(lua, 0, LUA_MULTRET);
+    else
+        printf(
+            "test_dump2str_empty: non function on stack top [%s]\n",
+            stack_dump(lua)
+        );
+
+    char *dump = table_dump2allocated_str(lua);
+    if (dump) {
+        printf("test_dump2str: dump '%s'\n", dump);
+        free(dump);
     }
 
-    /*
-    {
-        lua_State *l = luaL_newstate();
-        luaL_openlibs(l);
-        luaL_loadstring(l, dump);
-        lua_call(l, 0, 1);
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
+    munit_assert(lua_gettop(lua) == 3);
+    lua_close(lua);
 
-        {
-            lua_pushstring(l, "f");
-            munit_assert(lua_gettable(l, -2) == LUA_TTABLE);
+    return MUNIT_OK;
+}
 
-            for (int i = 1; i <= 3; i++) {
-                munit_assert(lua_geti(l, -1, i) == LUA_TNUMBER);
-                double n = lua_tonumber(l, -1);
-                munit_assert(n == i);
-                lua_remove(l, -1);
-            }
+static MunitResult test_dump2str_empty(
+    const MunitParameter params[], void* data
+) {
+    lua_State *lua = luaL_newstate();
+    luaL_openlibs(lua);
 
-            lua_remove(l, -1);
-        }
+    const char *code =  "return {  }\n";
 
-        {
-            lua_pushstring(l, "a");
-            munit_assert(lua_gettable(l, -2) == LUA_TTABLE);
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
+    munit_assert(lua_gettop(lua) == 0);
 
-            const char *values[] = { "her", "var", "par", NULL };
-            char **pvalue = (char**)values;
+    luaL_loadstring(lua, code);
 
-            lua_pushnil(l);
-            while (lua_next(l, -2)) {
-                munit_assert(lua_type(l, -1) == LUA_TSTRING);
+    int type = lua_type(lua, lua_gettop(lua));
+    printf("test_dump2str_empty: %s\n", lua_typename(lua, type));
+    if (type == LUA_TFUNCTION)
+        lua_call(lua, 0, LUA_MULTRET);
+    else
+        printf(
+            "test_dump2str_empty: non function on stack top [%s]\n",
+            stack_dump(lua)
+        );
 
-                if (!pvalue) {
-                    free(dump);
-                    lua_close(l);
-                    return MUNIT_FAIL;
-                }
-
-                munit_assert(!strcmp(*pvalue, lua_tostring(l, -1)));
-                pvalue++;
-                lua_remove(l, -1);
-            }
-        }
-
-        lua_close(l);
+    char *dump = table_dump2allocated_str(lua);
+    if (dump) {
+        printf("test_dump2str: dump '%s'\n", dump);
+        free(dump);
     }
-    */
 
-    free(dump);
+    printf("test_dump2str_empty: [%s]\n", stack_dump(lua));
+    munit_assert(lua_gettop(lua) == 1);
+    lua_close(lua);
 
     return MUNIT_OK;
 }
@@ -167,7 +260,7 @@ static MunitResult test_dump2str(
     return MUNIT_OK;
 }
 
-// Дублирование элементов на стеке
+// Дублирование элементов на стеке через lua_pushvalue() 
 static MunitResult test_stack_dup(
     const MunitParameter params[], void* data
 ) {
@@ -243,7 +336,7 @@ static MunitResult test_table_printing(
     printf("printed_key2 %s, printed_v2 %lf\n", printed_key2, printed_v2);
 
     printf("{\n%s}\n", tbl_str); 
-    print_table(lua, 1);
+    table_print(lua, 1);
 
     int errcode = luaL_dostring(lua,    "for k, v in pairs(XX) do"
                                         "   print(k, v)"
@@ -263,13 +356,28 @@ static MunitTest test_suite_tests[] = {
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
-    (char*) "/dump2str_fail",
-    test_dump2str_fail,
+    (char*) "/dump2str_empty",
+    test_dump2str_empty,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/dump2str_stack_check",
+    test_dump2str_stack_check,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/dump2str_nil_stack_check",
+    test_dump2str_nil_stack_check,
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
     (char*) "/dump2str",
     test_dump2str,
+    NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
+  },
+  {
+    (char*) "/table_push_rect_as_arr",
+    test_table_push_rect_as_arr,
     NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL
   },
   {
