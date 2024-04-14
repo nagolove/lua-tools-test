@@ -9,10 +9,8 @@
 #include "munit.h"
 #include "raylib.h"
 #include <assert.h>
-#include <math.h>
 #include <memory.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +84,10 @@ static MunitResult test_dump2str_nil_stack_check(
     munit_assert(lua_gettop(lua) == 3);
 
     int type = lua_type(lua, lua_gettop(lua));
-    printf("test_dump2str_empty: %s\n", lua_typename(lua, type));
+    /*printf("test_dump2str_empty: %s\n", lua_typename(lua, type));*/
+    munit_assert(type == LUA_TFUNCTION);
+
+    /*
     if (type == LUA_TFUNCTION)
         lua_call(lua, 0, LUA_MULTRET);
     else
@@ -94,6 +95,7 @@ static MunitResult test_dump2str_nil_stack_check(
             "test_dump2str_empty: non function on stack top [%s]\n",
             stack_dump(lua)
         );
+    */
 
     char *dump = table_dump2allocated_str(lua);
     if (dump) {
@@ -124,7 +126,11 @@ static MunitResult test_dump2str_stack_check(
     munit_assert(lua_gettop(lua) == 3);
 
     int type = lua_type(lua, lua_gettop(lua));
-    printf("test_dump2str_empty: %s\n", lua_typename(lua, type));
+
+    /*printf("test_dump2str_empty: %s\n", lua_typename(lua, type));*/
+    munit_assert(type == LUA_TFUNCTION);
+
+    /*
     if (type == LUA_TFUNCTION)
         lua_call(lua, 0, LUA_MULTRET);
     else
@@ -132,6 +138,7 @@ static MunitResult test_dump2str_stack_check(
             "test_dump2str_empty: non function on stack top [%s]\n",
             stack_dump(lua)
         );
+    */
 
     char *dump = table_dump2allocated_str(lua);
     if (dump) {
@@ -246,6 +253,7 @@ static MunitResult test_dump2str(
                     return MUNIT_FAIL;
                 }
 
+                assert(*pvalue);
                 munit_assert(!strcmp(*pvalue, lua_tostring(l, -1)));
                 pvalue++;
                 lua_remove(l, -1);
